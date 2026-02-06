@@ -1,0 +1,12 @@
+node_modules
+dist
+dist_electron
+out
+*.log
+.idea
+.vscode
+*.exe
+*.dll
+*.pak
+*.dat
+*.bin

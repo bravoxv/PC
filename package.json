@@ -1,0 +1,38 @@
+{
+    "name": "widgets-pc",
+    "private": true,
+    "version": "1.0.0",
+    "main": "electron/main.js",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build && electron-builder",
+        "preview": "vite preview",
+        "electron:dev": "electron ."
+    },
+    "dependencies": {
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0"
+    },
+    "devDependencies": {
+        "@vitejs/plugin-react": "^5.1.1",
+        "electron": "^33.0.0",
+        "electron-builder": "^24.13.3",
+        "vite": "^7.2.4"
+    },
+    "build": {
+        "appId": "com.widgets.pc",
+        "productName": "Widgets PC",
+        "directories": {
+            "output": "dist_electron"
+        },
+        "files": [
+            "dist/**/*",
+            "electron/**/*",
+            "package.json"
+        ],
+        "win": {
+            "target": "portable",
+            "icon": "public/vite.svg"
+        }
+    }
+}
