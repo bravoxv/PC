@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, session, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, session, ipcMain, Menu, MenuItem } = require('electron');
 const path = require('path');
 
 // Desactivar el particionamiento de cookies y storage para que iframes y ventanas compartan TODO
@@ -161,6 +161,32 @@ function createWindow() {
 
 app.whenReady().then(() => {
     createWindow();
+
+    // MENÚ CONTEXTUAL GLOBAL (para WebViews y Ventanas)
+    app.on('web-contents-created', (event, contents) => {
+        contents.on('context-menu', (e, params) => {
+            const menu = new Menu();
+
+            // Solo mostrar si es editable o hay texto seleccionado
+            if (params.isEditable || params.selectionText.length > 0 || contents.getType() === 'webview') {
+                menu.append(new MenuItem({ label: 'Cortar', role: 'cut', enabled: params.isEditable }));
+                menu.append(new MenuItem({ label: 'Copiar', role: 'copy', enabled: params.editFlags.canCopy }));
+                menu.append(new MenuItem({ label: 'Pegar', role: 'paste', enabled: params.editFlags.canPaste }));
+                menu.append(new MenuItem({ type: 'separator' }));
+                menu.append(new MenuItem({ label: 'Seleccionar todo', role: 'selectAll' }));
+
+                // Si es un webview (widget), añadir opción de recargar
+                if (contents.getType() === 'webview') {
+                    menu.append(new MenuItem({ type: 'separator' }));
+                    menu.append(new MenuItem({ label: 'Recargar', click: () => contents.reload() }));
+                    // menu.append(new MenuItem({ label: 'Inspeccionar', click: () => contents.openDevTools() })); // Opcional
+                }
+
+                menu.popup();
+            }
+        });
+    });
+
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });

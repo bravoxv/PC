@@ -342,15 +342,15 @@ function App() {
                                 <>
                                     <p>Copia tus enlaces de widgets aquí:</p>
                                     <div className="help-links">
-                                        <button onClick={() => openExternal('https://streamlabs.com/dashboard#/widgets/gallery')} className="help-link">
+                                        <button onClick={() => openExternal('')} className="help-link">
                                             <Logo name="streamlabs" />
                                             <span>Streamlabs</span>
                                         </button>
-                                        <button onClick={() => openExternal('https://streamelements.com/dashboard/overlays')} className="help-link">
+                                        <button onClick={() => openExternal('')} className="help-link">
                                             <Logo name="streamelements" />
                                             <span>Elements</span>
                                         </button>
-                                        <button onClick={() => openExternal('https://botrix.live/panel/widget')} className="help-link">
+                                        <button onClick={() => openExternal('')} className="help-link">
                                             <Logo name="botrix" />
                                             <span>Botrix</span>
                                         </button>
