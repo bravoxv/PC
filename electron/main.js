@@ -104,15 +104,36 @@ function createWindow() {
     });
 
     // SISTEMA "VENTANA DE NAVEGADOR NATIVA": Abre popouts usando el motor del sistema en modo APP
-    ipcMain.on('open-external', (event, url) => {
-        console.log('[DEBUG] Lanzando Navegador Nativo en Modo App:', url);
+    ipcMain.on('open-external', (event, { url, browser }) => {
+        console.log(`[DEBUG] Lanzando ${browser || 'default'} con URL:`, url);
 
-        // Comando para Windows: start chrome --app=URL
-        // Esto abre una ventana de Chrome "limpia" (sin pestañas ni barra de direcciones)
-        // Funciona tambien con Edge si es el default, o Brave
-        require('child_process').exec(`start chrome --app=${url}`, (err) => {
+        let command;
+        switch (browser) {
+            case 'chrome':
+                command = `start chrome --app=${url}`;
+                break;
+            case 'brave':
+                command = `start brave --app=${url}`;
+                break;
+            case 'edge':
+                command = `start msedge --app=${url}`;
+                break;
+            case 'firefox':
+                // Firefox no soporta modo "app" nativo fácilmente, abrimos ventana nueva simple
+                command = `start firefox -new-window ${url}`;
+                break;
+            case 'opera':
+                command = `start opera --new-window ${url}`;
+                break;
+            case 'default':
+            default:
+                shell.openExternal(url);
+                return;
+        }
+
+        require('child_process').exec(command, (err) => {
             if (err) {
-                console.error('Error al abrir modo app, intentando metodo estandar:', err);
+                console.error(`Error al abrir con ${browser}, intentando metodo estandar:`, err);
                 shell.openExternal(url);
             }
         });
@@ -147,6 +168,17 @@ function createWindow() {
         };
     });
 
+    // LIMPIEZA DE DATOS (Factory Reset)
+    ipcMain.on('clear-data', async () => {
+        try {
+            await session.defaultSession.clearStorageData();
+            console.log('Datos de sesión borrados.');
+            win.reload();
+        } catch (e) {
+            console.error('Error borrando datos:', e);
+        }
+    });
+
     // Interceptores de navegación para dashboards
     const handleNavigation = (url) => {
         const u = url.toLowerCase();
@@ -160,8 +192,6 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-    createWindow();
-
     // MENÚ CONTEXTUAL GLOBAL (para WebViews y Ventanas)
     app.on('web-contents-created', (event, contents) => {
         contents.on('context-menu', (e, params) => {
@@ -186,6 +216,8 @@ app.whenReady().then(() => {
             }
         });
     });
+
+    createWindow();
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();

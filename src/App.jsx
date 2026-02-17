@@ -25,8 +25,14 @@ function App() {
         return saved ? JSON.parse(saved) : [];
     });
 
+    const [selectedBrowser, setSelectedBrowser] = useState(() => {
+        return localStorage.getItem('preferredBrowser') || 'chrome';
+    });
+
     const [activeIndex, setActiveIndex] = useState(0);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [newWidget, setNewWidget] = useState({ name: '', url: '', bgColor: '#000000', icon: '📺', shortcut: '' });
     const [editingWidget, setEditingWidget] = useState(null);
@@ -42,6 +48,10 @@ function App() {
     useEffect(() => {
         localStorage.setItem('widgets', JSON.stringify(widgets));
     }, [widgets]);
+
+    useEffect(() => {
+        localStorage.setItem('preferredBrowser', selectedBrowser);
+    }, [selectedBrowser]);
 
     const nextWidget = () => {
         if (widgets.length === 0) return;
@@ -97,7 +107,23 @@ function App() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
     }, [widgets, isModalOpen, editingWidget, isFullScreen]);
+
+    // Close menu when clicking outside
+    useEffect(() => {
+        const closeMenu = () => setIsMenuOpen(false);
+        if (isMenuOpen) {
+            window.addEventListener('click', closeMenu);
+        }
+        return () => window.removeEventListener('click', closeMenu);
+    }, [isMenuOpen]);
+
+    // Ensure manage modal closes when main modal opens (optional safety)
+    useEffect(() => {
+        if (isModalOpen) setIsManageModalOpen(false);
+    }, [isModalOpen]);
 
     const resetControlsTimer = () => {
         setShowControls(true);
@@ -270,33 +296,97 @@ function App() {
 
     const openExternal = (url) => {
         if (window.electronAPI && window.electronAPI.openExternal) {
-            window.electronAPI.openExternal(url);
+            window.electronAPI.openExternal(url, selectedBrowser);
         } else {
             window.open(url, '_blank');
         }
     };
 
+    const resetApp = () => {
+        if (window.confirm('¿ESTÁS SEGURO? Esto borrará todos los widgets y cerrará todas las sesiones activas (Twitch, Google, etc).')) {
+            setWidgets([]);
+            localStorage.removeItem('widgets');
+            localStorage.removeItem('preferredBrowser');
+            if (window.electronAPI && window.electronAPI.clearData) {
+                window.electronAPI.clearData();
+            } else {
+                window.location.reload();
+            }
+        }
+    };
+
     return (
         <div className="app-container">
-            {/* Header ... */}
             <header>
-                {/* ... existing header content ... */}
+                <div className="header-left">
+                    <button className="control-btn" onClick={() => setIsSidebarOpen(true)} title="Lista de Ventanas" style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 1 }}>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '800', letterSpacing: '0.5px' }}>LISTA DE VENTANAS</span>
+                    </button>
+                </div>
                 <div className="header-right">
                     {activeWidget && isPopoutUrl(activeWidget.url) && (
-                        <button className="control-btn" onClick={() => openExternal(activeWidget.url)} title="Abrir Popout en Navegador">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                        </button>
+                        <div className="browser-select-group">
+                            <span className="browser-label">Abrir con:</span>
+                            <select
+                                value={selectedBrowser}
+                                onChange={(e) => setSelectedBrowser(e.target.value)}
+                                className="header-browser-select"
+                                key="browser-select"
+                            >
+                                <option value="chrome">Chrome</option>
+                                <option value="brave">Brave</option>
+                                <option value="edge">Edge</option>
+                                <option value="firefox">Firefox</option>
+                                <option value="opera">Opera</option>
+                                <option value="default">Default</option>
+                            </select>
+                            <button className="control-btn" onClick={() => openExternal(activeWidget.url)} title={`Abrir Popout en ${selectedBrowser}`}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                            </button>
+                        </div>
                     )}
-                    <button className="control-btn" onClick={() => window.electronAPI?.openDevTools()} title="Inspeccionar (Consola)">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6" /></svg>
-                    </button>
-                    <button className="add-btn" onClick={() => setIsModalOpen(true)}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    </button>
+                    <div className="header-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <button className="add-btn" onClick={() => setIsModalOpen(true)} title="Agregar Widget" style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '900', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>➕</span> AGREGAR
+                        </button>
+
+                        <div className="menu-container" style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+                            <button className="control-btn" onClick={() => setIsMenuOpen(!isMenuOpen)} title="Menú">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle><circle cx="5" cy="12" r="1.5"></circle></svg>
+                            </button>
+                            {isMenuOpen && (
+                                <div className="dropdown-menu">
+                                    <button onClick={() => { setIsManageModalOpen(true); setIsMenuOpen(false); }}>
+                                        <span className="icon">📂</span> Gestionar Ventanas
+                                    </button>
+                                    <div className="separator"></div>
+                                    <div className="menu-section-title">ELIMINAR INDIVIDUAL</div>
+                                    <div className="menu-windows-list">
+                                        {widgets.map((w, index) => (
+                                            <div key={w.id} className="menu-window-item">
+                                                <div className="menu-window-info" onClick={() => { setActiveIndex(index); setIsMenuOpen(false); }}>
+                                                    <span>{w.icon || '📺'}</span>
+                                                    <span className="menu-window-name">{w.name}</span>
+                                                </div>
+                                                <button className="menu-window-delete" onClick={(e) => { e.stopPropagation(); removeWidget(w.id); }} title="Eliminar">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {widgets.length === 0 && <div className="menu-empty-text">Sin ventanas</div>}
+                                    </div>
+                                    <div className="separator"></div>
+                                    <button onClick={() => { resetApp(); setIsMenuOpen(false); }} className="danger-item">
+                                        <span className="icon">⚠️</span> Restablecer Todo
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </header>
 
-            {/* Sidebar de Lista */}
             <div className={`sidebar ${isSidebarOpen ? 'open' : ''}`} onClick={() => setIsSidebarOpen(false)}>
                 <div className="sidebar-content" onClick={e => e.stopPropagation()}>
                     <div className="sidebar-header">
@@ -339,27 +429,29 @@ function App() {
                                 </button>
                             </div>
                             {showHelpLinks && (
-                                <>
-                                    <p>Copia tus enlaces de widgets aquí:</p>
-                                    <div className="help-links">
-                                        <button onClick={() => openExternal('')} className="help-link">
-                                            <Logo name="streamlabs" />
-                                            <span>Streamlabs</span>
-                                        </button>
-                                        <button onClick={() => openExternal('')} className="help-link">
-                                            <Logo name="streamelements" />
-                                            <span>Elements</span>
-                                        </button>
-                                        <button onClick={() => openExternal('')} className="help-link">
-                                            <Logo name="botrix" />
-                                            <span>Botrix</span>
-                                        </button>
-                                    </div>
-                                </>
+                                <div className="help-links">
+                                    <button onClick={() => openExternal('https://streamlabs.com')} className="help-link">
+                                        <Logo name="streamlabs" />
+                                        <span>Streamlabs</span>
+                                    </button>
+                                    <button onClick={() => openExternal('https://streamelements.com')} className="help-link">
+                                        <Logo name="streamelements" />
+                                        <span>Elements</span>
+                                    </button>
+                                    <button onClick={() => openExternal('https://botrix.live')} className="help-link">
+                                        <Logo name="botrix" />
+                                        <span>Botrix</span>
+                                    </button>
+                                </div>
                             )}
                         </div>
-                        <button className="clear-data-btn" onClick={() => { if (window.confirm('¿Borrar todos los widgets?')) { setWidgets([]); localStorage.removeItem('widgets'); } }}>
-                            Borrar todos los datos
+                        <button className="clear-data-btn" onClick={() => {
+                            if (window.confirm('¿Eliminar todas las ventanas de la lista?')) {
+                                setWidgets([]);
+                                localStorage.removeItem('widgets');
+                            }
+                        }} style={{ marginTop: '10px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold' }}>
+                            <span>🗑️</span> BORRAR TODO
                         </button>
                     </div>
                 </div>
@@ -503,9 +595,46 @@ function App() {
                     </div>
                 </div>
             )}
+
+            {isManageModalOpen && (
+                <div className="modal-overlay" onClick={() => setIsManageModalOpen(false)}>
+                    <div className="modal-content manage-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                            <h2 style={{ margin: 0 }}>Gestionar Ventanas</h2>
+                            <button className="close-btn" onClick={() => setIsManageModalOpen(false)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '24px', cursor: 'pointer' }}>×</button>
+                        </div>
+                        <div className="manage-list">
+                            {widgets.length === 0 ? (
+                                <p className="empty-text">No hay ventanas cargadas.</p>
+                            ) : (
+                                widgets.map((w) => (
+                                    <div key={w.id} className="manage-item">
+                                        <div className="manage-item-info">
+                                            <span className="manage-item-icon">{w.icon || '📺'}</span>
+                                            <div className="manage-item-text">
+                                                <span className="manage-item-name">{w.name}</span>
+                                                <span className="manage-item-url">{w.url}</span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            className="manage-delete-btn"
+                                            onClick={() => removeWidget(w.id)}
+                                            title="Eliminar ventana"
+                                        >
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                        </button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        <div className="modal-actions">
+                            <button onClick={() => setIsManageModalOpen(false)} style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
 export default App;
-

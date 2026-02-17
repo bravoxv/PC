@@ -769,3 +769,274 @@ iframe {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-muted);
 }
+
+.browser-select-group {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 4px 8px;
+    border-radius: 8px;
+    margin-right: 10px;
+    border: 1px solid var(--glass-border);
+    transition: 0.2s;
+}
+
+.browser-select-group:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.browser-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-right: 8px;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.header-browser-select {
+    background: transparent;
+    border: none;
+    color: var(--primary);
+    font-size: 0.8rem;
+    outline: none;
+    cursor: pointer;
+    margin-right: 8px;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.header-browser-select option {
+    background: var(--bg-card);
+    color: white;
+    padding: 10px;
+}
+
+.header-browser-select:hover {
+    color: white;
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    width: 240px;
+    background: var(--bg-card);
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 1000;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    margin-top: 10px;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.dropdown-menu button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    cursor: pointer;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    text-align: left;
+    transition: 0.2s;
+}
+
+.dropdown-menu button:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.dropdown-menu .separator {
+    height: 1px;
+    background: var(--glass-border);
+    margin: 4px 0;
+}
+
+.dropdown-menu .danger-item {
+    color: #ef4444;
+}
+
+.dropdown-menu .danger-item:hover {
+    background: #ef444422;
+    color: #ef4444;
+}
+
+.dropdown-menu .icon {
+    font-size: 1.1rem;
+}
+
+/* Window Management in Menu */
+.menu-section-title {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-weight: 800;
+    padding: 8px 10px 4px 10px;
+    letter-spacing: 0.5px;
+}
+
+.menu-windows-list {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.menu-window-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-radius: 8px;
+    transition: 0.2s;
+}
+
+.menu-window-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.menu-window-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.menu-window-name {
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.menu-window-delete {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    padding: 2px 6px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: 0.2s;
+    opacity: 0.4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.menu-window-delete:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    opacity: 1;
+}
+
+.menu-empty-text {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    padding: 10px;
+    text-align: center;
+    font-style: italic;
+}
+
+/* Manage Modal Styles */
+.manage-modal {
+    max-width: 600px !important;
+    width: 90% !important;
+}
+
+.manage-list {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-top: 20px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+}
+
+.manage-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    background: var(--bg-card);
+    border-radius: 12px;
+    margin-bottom: 8px;
+    border: 1px solid var(--glass-border);
+    transition: 0.2s;
+}
+
+.manage-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--primary);
+}
+
+.manage-item-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    overflow: hidden;
+}
+
+.manage-item-icon {
+    font-size: 1.4rem;
+}
+
+.manage-item-text {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.manage-item-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.manage-item-url {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.manage-delete-btn {
+    background: rgba(239, 68, 68, 0.1);
+    border: none;
+    color: #ef4444;
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.manage-delete-btn:hover {
+    background: #ef4444;
+    color: white;
+}
