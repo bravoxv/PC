@@ -1,35 +1,20 @@
 @echo off
-title Actualizar Widgets PC
-echo ------------------------------------------
-echo       CREANDO NUEVA VERSION (.EXE)
-echo ------------------------------------------
+setlocal
 
-:: Comprobar si existe la carpeta node_modules
-if not exist node_modules (
-    echo [!] No se han instalado las dependencias.
-    echo [!] Instalando...
-    call npm install
-)
-
-echo.
-echo [1/1] Compilando y empaquetando aplicacion...
-echo (Esto puede tardar un par de minutos, por favor espera)
+echo ========================================
+echo   ACTUALIZADOR DE WIDGETS PC (ELECTRON)
+echo ========================================
 echo.
 
+echo [1/2] Limpiando carpeta dist_electron...
+if exist dist_electron rmdir /s /q dist_electron
+
+echo [2/2] Compilando y Empaquetando Aplicacion...
 call npm run build
 
-if %ERRORLEVEL% EQU 0 (
-    echo.
-    echo ------------------------------------------
-    echo       ¡ACTUALIZACION COMPLETADA!
-    echo ------------------------------------------
-    echo Tu nuevo archivo .exe esta listo en:
-    echo Carpeta: PC\dist_electron
-    echo.
-) else (
-    echo.
-    echo [ERROR] Hubo un problema al crear la actualizacion.
-    echo Revisa los mensajes de arriba.
-)
-
+echo.
+echo ========================================
+echo   PROCESO TERMINADO CON EXITO
+echo   Tu nuevo .exe esta en: dist_electron\Widgets PC 1.0.1.exe
+echo ========================================
 pause

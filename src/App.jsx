@@ -32,6 +32,10 @@ function App() {
     const [editingWidget, setEditingWidget] = useState(null);
     const [showHelpLinks, setShowHelpLinks] = useState(true);
     const [draggedItemIndex, setDraggedItemIndex] = useState(null);
+    const [isFullScreen, setIsFullScreen] = useState(false);
+    const [showControls, setShowControls] = useState(true);
+    const controlsTimeoutRef = useRef(null);
+    const widgetContainerRef = useRef(null);
 
     const commonEmojis = ['📺', '💬', '🎁', '🔔', '📈', '🎮', '💡', '🔥', '✨', '🏆', '🌈', '⚡'];
 
@@ -49,13 +53,22 @@ function App() {
         setActiveIndex((prev) => (prev - 1 + widgets.length) % widgets.length);
     };
 
-    // Keyboard Navigation
     useEffect(() => {
         const handleKeyDown = (e) => {
-            // Don't trigger if user is typing in an input or modal is open
-            if (isModalOpen || editingWidget || document.activeElement.tagName === 'INPUT') return;
+            // Don't trigger if user is typing in an input or modal is open (except for Esc in full screen)
+            if (isModalOpen || editingWidget || document.activeElement.tagName === 'INPUT') {
+                if (e.key === 'Escape' && isFullScreen) {
+                    toggleFullScreen();
+                }
+                return;
+            }
 
             if (widgets.length === 0) return;
+
+            if (e.key === 'Escape' && isFullScreen) {
+                toggleFullScreen();
+                return;
+            }
 
             // Global navigation
             if (e.key === 'ArrowRight') {
@@ -84,22 +97,121 @@ function App() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [widgets, isModalOpen, editingWidget]);
+    }, [widgets, isModalOpen, editingWidget, isFullScreen]);
+
+    const resetControlsTimer = () => {
+        setShowControls(true);
+        if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = setTimeout(() => {
+            if (isFullScreen) setShowControls(false);
+        }, 3000);
+    };
+
+    useEffect(() => {
+        if (isFullScreen) {
+            window.addEventListener('mousemove', resetControlsTimer);
+            window.addEventListener('mousedown', resetControlsTimer);
+            resetControlsTimer();
+        } else {
+            setShowControls(true);
+            window.removeEventListener('mousemove', resetControlsTimer);
+            window.removeEventListener('mousedown', resetControlsTimer);
+            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+        }
+        return () => {
+            window.removeEventListener('mousemove', resetControlsTimer);
+            window.removeEventListener('mousedown', resetControlsTimer);
+            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+        };
+    }, [isFullScreen]);
+
+    const toggleFullScreen = () => {
+        if (!isFullScreen) {
+            if (widgetContainerRef.current) {
+                if (widgetContainerRef.current.requestFullscreen) {
+                    widgetContainerRef.current.requestFullscreen();
+                } else if (widgetContainerRef.current.webkitRequestFullscreen) {
+                    widgetContainerRef.current.webkitRequestFullscreen();
+                } else if (widgetContainerRef.current.msRequestFullscreen) {
+                    widgetContainerRef.current.msRequestFullscreen();
+                }
+            }
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+        }
+    };
+
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullScreen(!!document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
+    const formatUrl = (url) => {
+        let formatted = url.trim();
+
+        // YouTube
+        if (formatted.includes('youtube.com/watch?v=')) {
+            const urlObj = new URL(formatted);
+            const videoId = urlObj.searchParams.get('v');
+            // Check if it's a live chat request
+            if (formatted.includes('&chat=1')) {
+                return `https://www.youtube.com/live_chat?v=${videoId}&is_popout=1`;
+            }
+            return `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+        }
+        if (formatted.includes('youtu.be/')) {
+            const videoId = formatted.split('/').pop().split('?')[0];
+            return `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+        }
+        // YouTube Live Chat
+        if (formatted.includes('youtube.com/live_chat')) {
+            if (!formatted.includes('is_popout=1')) {
+                return formatted + (formatted.includes('?') ? '&' : '?') + 'is_popout=1';
+            }
+            return formatted;
+        }
+
+        // Twitch Stream (standard link)
+        if (formatted.includes('twitch.tv/') && !formatted.includes('player.twitch.tv') && !formatted.includes('popout') && !formatted.includes('dashboard')) {
+            const channel = formatted.split('/').pop().split('?')[0];
+            // If the user wants chat, they should use the popout link, but we'll default to player for channel links
+            return `https://player.twitch.tv/?channel=${channel}&parent=localhost&autoplay=true`;
+        }
+
+        // Kick
+        if (formatted.includes('kick.com/') && !formatted.includes('popout') && !formatted.includes('auth')) {
+            const parts = formatted.split('/');
+            const channel = parts[parts.length - 1].split('?')[0];
+            // If it's a channel link, convert to chat popout as it's the most common "interactable" widget
+            return `https://kick.com/popout/${channel}/chat`;
+        }
+
+        return formatted;
+    };
 
     const addWidget = (e) => {
         e.preventDefault();
         if (!newWidget.name || !newWidget.url) return;
         const id = Date.now().toString();
-        const updated = [...widgets, { ...newWidget, url: newWidget.url.trim(), id }];
+        const updated = [...widgets, { ...newWidget, url: formatUrl(newWidget.url), id }];
         setWidgets(updated);
         setActiveIndex(updated.length - 1);
-        setNewWidget({ name: '', url: '', bgColor: '#000000', icon: '📺' });
+        setNewWidget({ name: '', url: '', bgColor: '#000000', icon: '📺', shortcut: '' });
         setIsModalOpen(false);
     };
 
     const updateWidget = (e) => {
         e.preventDefault();
-        const updated = widgets.map(w => w.id === editingWidget.id ? { ...editingWidget, url: editingWidget.url.trim() } : w);
+        const updated = widgets.map(w => w.id === editingWidget.id ? { ...editingWidget, url: formatUrl(editingWidget.url) } : w);
         setWidgets(updated);
         setEditingWidget(null);
     };
@@ -150,20 +262,34 @@ function App() {
 
     const activeWidget = widgets[activeIndex];
 
+    const isPopoutUrl = (url) => {
+        if (!url) return false;
+        const u = url.toLowerCase();
+        return u.includes('dashboard') || u.includes('popout') || u.includes('stream-info') || u.includes('twitch.tv/popout');
+    };
+
     const openExternal = (url) => {
-        window.open(url, '_blank');
+        if (window.electronAPI && window.electronAPI.openExternal) {
+            window.electronAPI.openExternal(url);
+        } else {
+            window.open(url, '_blank');
+        }
     };
 
     return (
         <div className="app-container">
+            {/* Header ... */}
             <header>
-                <div className="header-left">
-                    <button className="menu-btn" onClick={() => setIsSidebarOpen(true)}>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-                    </button>
-                    <h1>Widgets PC</h1>
-                </div>
+                {/* ... existing header content ... */}
                 <div className="header-right">
+                    {activeWidget && isPopoutUrl(activeWidget.url) && (
+                        <button className="control-btn" onClick={() => openExternal(activeWidget.url)} title="Abrir Popout en Navegador">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                        </button>
+                    )}
+                    <button className="control-btn" onClick={() => window.electronAPI?.openDevTools()} title="Inspeccionar (Consola)">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6" /></svg>
+                    </button>
                     <button className="add-btn" onClick={() => setIsModalOpen(true)}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     </button>
@@ -265,26 +391,42 @@ function App() {
                                 <button className="control-btn" onClick={() => setEditingWidget(activeWidget)} title="Editar">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                                 </button>
+                                <button className="control-btn" onClick={toggleFullScreen} title="Pantalla Completa">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                                </button>
                                 <button className="nav-arrow right" onClick={nextWidget}>
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
                                 </button>
                             </div>
                         </div>
-                        <div className="iframe-container">
+                        <div className={`iframe-container ${isFullScreen ? 'fullscreen-mode' : ''}`} ref={widgetContainerRef}>
+                            {isFullScreen && (
+                                <div className={`fullscreen-controls ${showControls ? 'visible' : ''}`}>
+                                    <button className="fs-nav-btn left" onClick={prevWidget}>
+                                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                                    </button>
+                                    <button className="fs-exit-btn" onClick={toggleFullScreen}>
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                    </button>
+                                    <button className="fs-nav-btn right" onClick={nextWidget}>
+                                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                    </button>
+                                </div>
+                            )}
                             {widgets.map((widget, index) => (
                                 <div
                                     key={widget.id}
                                     className={`iframe-wrapper ${index === activeIndex ? 'active' : 'hidden'}`}
                                     style={{ backgroundColor: widget.bgColor || '#000000' }}
                                 >
-                                    <iframe
-                                        id={`iframe-${widget.id}`}
+                                    <webview
+                                        id={`widget-${widget.id}`}
                                         src={widget.url}
-                                        title={widget.name}
-                                        allow="autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                        allowFullScreen
-                                        referrerPolicy="no-referrer"
-                                    ></iframe>
+                                        style={{ width: '100%', height: '100%', border: 'none' }}
+                                        allowfullscreen
+                                        partition="persist:main"
+                                        useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                                    ></webview>
                                 </div>
                             ))}
                         </div>
