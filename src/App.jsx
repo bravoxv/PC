@@ -32,7 +32,6 @@ function App() {
     const [activeIndex, setActiveIndex] = useState(0);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [newWidget, setNewWidget] = useState({ name: '', url: '', bgColor: '#000000', icon: '📺', shortcut: '' });
     const [editingWidget, setEditingWidget] = useState(null);
@@ -111,14 +110,7 @@ function App() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [widgets, isModalOpen, editingWidget, isFullScreen]);
 
-    // Close menu when clicking outside
-    useEffect(() => {
-        const closeMenu = () => setIsMenuOpen(false);
-        if (isMenuOpen) {
-            window.addEventListener('click', closeMenu);
-        }
-        return () => window.removeEventListener('click', closeMenu);
-    }, [isMenuOpen]);
+
 
     // Ensure manage modal closes when main modal opens (optional safety)
     useEffect(() => {
@@ -291,7 +283,7 @@ function App() {
     const isPopoutUrl = (url) => {
         if (!url) return false;
         const u = url.toLowerCase();
-        return u.includes('dashboard') || u.includes('popout') || u.includes('stream-info') || u.includes('twitch.tv/popout');
+        return u.includes('dashboard') || u.includes('popout') || u.includes('stream-info') || u.includes('twitch.tv/popout') || u.includes('google.com');
     };
 
     const openExternal = (url) => {
@@ -351,38 +343,7 @@ function App() {
                             <span>➕</span> AGREGAR
                         </button>
 
-                        <div className="menu-container" style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
-                            <button className="control-btn" onClick={() => setIsMenuOpen(!isMenuOpen)} title="Menú">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle><circle cx="5" cy="12" r="1.5"></circle></svg>
-                            </button>
-                            {isMenuOpen && (
-                                <div className="dropdown-menu">
-                                    <button onClick={() => { setIsManageModalOpen(true); setIsMenuOpen(false); }}>
-                                        <span className="icon">📂</span> Gestionar Ventanas
-                                    </button>
-                                    <div className="separator"></div>
-                                    <div className="menu-section-title">ELIMINAR INDIVIDUAL</div>
-                                    <div className="menu-windows-list">
-                                        {widgets.map((w, index) => (
-                                            <div key={w.id} className="menu-window-item">
-                                                <div className="menu-window-info" onClick={() => { setActiveIndex(index); setIsMenuOpen(false); }}>
-                                                    <span>{w.icon || '📺'}</span>
-                                                    <span className="menu-window-name">{w.name}</span>
-                                                </div>
-                                                <button className="menu-window-delete" onClick={(e) => { e.stopPropagation(); removeWidget(w.id); }} title="Eliminar">
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                                </button>
-                                            </div>
-                                        ))}
-                                        {widgets.length === 0 && <div className="menu-empty-text">Sin ventanas</div>}
-                                    </div>
-                                    <div className="separator"></div>
-                                    <button onClick={() => { resetApp(); setIsMenuOpen(false); }} className="danger-item">
-                                        <span className="icon">⚠️</span> Restablecer Todo
-                                    </button>
-                                </div>
-                            )}
-                        </div>
+
                     </div>
                 </div>
             </header>
@@ -405,7 +366,6 @@ function App() {
                                 onDragEnd={handleDragEnd}
                             >
                                 <div className="item-main">
-                                    <span className="drag-handle">⋮⋮</span>
                                     <span className="item-icon">{w.icon || '📺'}</span>
                                     <div className="item-details">
                                         <span className="item-name">{w.name}</span>
@@ -445,13 +405,21 @@ function App() {
                                 </div>
                             )}
                         </div>
-                        <button className="clear-data-btn" onClick={() => {
-                            if (window.confirm('¿Eliminar todas las ventanas de la lista?')) {
-                                setWidgets([]);
-                                localStorage.removeItem('widgets');
-                            }
-                        }} style={{ marginTop: '10px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold' }}>
-                            <span>🗑️</span> BORRAR TODO
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                            <button className="control-btn" onClick={() => { setIsManageModalOpen(true); setIsSidebarOpen(false); }} title="Gestionar Ventanas" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '8px', opacity: 1, fontSize: '0.8rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                                📂 GESTIONAR
+                            </button>
+                            <button className="clear-data-btn" onClick={() => {
+                                if (window.confirm('¿Eliminar todas las ventanas de la lista?')) {
+                                    setWidgets([]);
+                                    localStorage.removeItem('widgets');
+                                }
+                            }} style={{ flex: 1.5, margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold' }}>
+                                <span>🗑️</span> BORRAR LISTA
+                            </button>
+                        </div>
+                        <button onClick={() => { resetApp(); setIsSidebarOpen(false); }} style={{ marginTop: '8px', width: '100%', padding: '10px', background: 'none', border: '1px solid #ef444455', color: '#ef4444', borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                            ⚠️ RESTABLECER TODO
                         </button>
                     </div>
                 </div>
