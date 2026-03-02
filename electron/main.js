@@ -27,7 +27,12 @@ function createWindow() {
         // 1. Identidad: Fingir ser Chrome 120 REAL (sin 'Electron' ni 'App')
         headers['User-Agent'] = userAgent;
 
-        // 2. Origen: Engañar al servidor diciendo que venimos de su propio dominio (vital para iFrames)
+        // 2. CLIENT HINTS (Crucial para Google moderno)
+        headers['Sec-CH-UA'] = '"Not A(Brand";v="99", "Google Chrome";v="120", "Chromium";v="120"';
+        headers['Sec-CH-UA-Mobile'] = '?0';
+        headers['Sec-CH-UA-Platform'] = '"Windows"';
+
+        // 3. Origen: Engañar al servidor diciendo que venimos de su propio dominio (vital para iFrames)
         if (details.url.includes('twitch.tv')) {
             headers['Origin'] = 'https://www.twitch.tv';
             headers['Referer'] = 'https://www.twitch.tv/';
@@ -36,11 +41,12 @@ function createWindow() {
             headers['Referer'] = 'https://kick.com/';
         }
 
-        // 3. Limpieza: Eliminar cualquier rastro de embebido/automatización
+        // 4. Limpieza: Eliminar cualquier rastro de embebido/automatización
         delete headers['X-Requested-With'];
-        delete headers['Sec-Fetch-Dest'];     // Ocultar que es un iframe/webview
-        delete headers['Sec-Fetch-Mode'];     // Ocultar modo navigate
-        delete headers['Sec-Fetch-Site'];     // Ocultar cross-site
+        delete headers['Sec-Fetch-Mode'];
+        delete headers['Sec-Fetch-Site'];
+        delete headers['Sec-Fetch-Dest'];
+        delete headers['X-DevTools-Emulate-Network-Condition-Client-Id'];
 
         callback({ cancel: false, requestHeaders: headers });
     });
