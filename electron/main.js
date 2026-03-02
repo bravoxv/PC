@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, session, ipcMain, Menu, MenuItem } = require('electron');
+const { app, BrowserWindow, shell, session, ipcMain, Menu, MenuItem, clipboard } = require('electron');
 const path = require('path');
 
 // Desactivar el particionamiento de cookies y storage para que iframes y ventanas compartan TODO
@@ -229,26 +229,49 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-    // MENÚ CONTEXTUAL GLOBAL (para WebViews y Ventanas)
+    // MENÚ CONTEXTUAL Y MANEJADOR DE LINKS PARA WEBVIEWS
     app.on('web-contents-created', (event, contents) => {
+        if (contents.getType() === 'webview') {
+            // Interceptar intentos de abrir nuevas pestañas/ventanas desde el widget
+            contents.setWindowOpenHandler(({ url }) => {
+                // Enviamos la URL a la ventana principal para que el usuario elija qué hacer
+                const mainWin = BrowserWindow.getAllWindows().find(w => !w.isAlwaysOnTop());
+                if (mainWin) mainWin.webContents.send('open-link-choice', { url });
+                return { action: 'deny' };
+            });
+        }
+
         contents.on('context-menu', (e, params) => {
             const menu = new Menu();
-
-            // Solo mostrar si es editable o hay texto seleccionado
             if (params.isEditable || params.selectionText.length > 0 || contents.getType() === 'webview') {
                 menu.append(new MenuItem({ label: 'Cortar', role: 'cut', enabled: params.isEditable }));
                 menu.append(new MenuItem({ label: 'Copiar', role: 'copy', enabled: params.editFlags.canCopy }));
                 menu.append(new MenuItem({ label: 'Pegar', role: 'paste', enabled: params.editFlags.canPaste }));
                 menu.append(new MenuItem({ type: 'separator' }));
+
+                if (params.linkURL) {
+                    menu.append(new MenuItem({
+                        label: 'Abrir enlace en pantalla dividida',
+                        click: () => {
+                            const mainWin = BrowserWindow.getAllWindows().find(w => !w.isAlwaysOnTop());
+                            if (mainWin) mainWin.webContents.send('open-link-choice', { url: params.linkURL, forceSplit: true });
+                        }
+                    }));
+                    menu.append(new MenuItem({
+                        label: 'Copiar dirección de enlace',
+                        click: () => {
+                            clipboard.writeText(params.linkURL);
+                        }
+                    }));
+                    menu.append(new MenuItem({ type: 'separator' }));
+                }
+
                 menu.append(new MenuItem({ label: 'Seleccionar todo', role: 'selectAll' }));
 
-                // Si es un webview (widget), añadir opción de recargar
                 if (contents.getType() === 'webview') {
                     menu.append(new MenuItem({ type: 'separator' }));
                     menu.append(new MenuItem({ label: 'Recargar', click: () => contents.reload() }));
-                    // menu.append(new MenuItem({ label: 'Inspeccionar', click: () => contents.openDevTools() })); // Opcional
                 }
-
                 menu.popup();
             }
         });

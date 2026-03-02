@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './index.css';
+import './SplitView.css';
 
 const Logo = ({ name }) => {
     const colors = {
@@ -29,7 +30,17 @@ function App() {
         return localStorage.getItem('preferredBrowser') || 'chrome';
     });
 
-    const [activeIndex, setActiveIndex] = useState(0);
+    const [activeIndex, setActiveIndex] = useState(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('mode') === 'mini') {
+            const startUrl = params.get('url');
+            const saved = localStorage.getItem('widgets');
+            const list = saved ? JSON.parse(saved) : [];
+            const found = list.findIndex(w => w.url === startUrl);
+            return found !== -1 ? found : 0;
+        }
+        return 0;
+    });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -43,6 +54,16 @@ function App() {
     const widgetContainerRef = useRef(null);
 
     const commonEmojis = ['📺', '💬', '🎁', '🔔', '📈', '🎮', '💡', '🔥', '✨', '🏆', '🌈', '⚡'];
+
+    useEffect(() => {
+        const handleStorage = (e) => {
+            if (e.key === 'widgets' && e.newValue) {
+                setWidgets(JSON.parse(e.newValue));
+            }
+        };
+        window.addEventListener('storage', handleStorage);
+        return () => window.removeEventListener('storage', handleStorage);
+    }, []);
 
     useEffect(() => {
         localStorage.setItem('widgets', JSON.stringify(widgets));
@@ -64,8 +85,12 @@ function App() {
 
     useEffect(() => {
         const handleKeyDown = (e) => {
+            // Check for mini mode - simple exit handled by window.close implicitly if shortcut used, 
+            // but here we focus on navigation
+            const isMini = new URLSearchParams(window.location.search).get('mode') === 'mini';
+
             // Don't trigger if user is typing in an input or modal is open (except for Esc in full screen)
-            if (isModalOpen || editingWidget || document.activeElement.tagName === 'INPUT') {
+            if (!isMini && (isModalOpen || editingWidget || document.activeElement.tagName === 'INPUT')) {
                 if (e.key === 'Escape' && isFullScreen) {
                     toggleFullScreen();
                 }
@@ -95,7 +120,7 @@ function App() {
                 return;
             }
 
-            // Default Number keys (only if widget doesn't have a shortcut that overrides it)
+            // Default Number keys
             if (e.key >= '1' && e.key <= '9') {
                 const index = parseInt(e.key) - 1;
                 if (index < widgets.length) {
@@ -104,8 +129,6 @@ function App() {
             }
         };
 
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [widgets, isModalOpen, editingWidget, isFullScreen]);
@@ -142,6 +165,44 @@ function App() {
             if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         };
     }, [isFullScreen]);
+
+    const [linkPrompt, setLinkPrompt] = useState(null); // { url, forceSplit }
+    const [isSplitInputOpen, setIsSplitInputOpen] = useState(false);
+    const [splitInputUrl, setSplitInputUrl] = useState('');
+
+    const activeIndexRef = useRef(activeIndex);
+    useEffect(() => {
+        activeIndexRef.current = activeIndex;
+    }, [activeIndex]);
+
+    const handleLinkAction = (url, action) => {
+        const currentIndex = activeIndexRef.current;
+        if (action === 'browser') {
+            openExternal(url);
+        } else if (action === 'split') {
+            setWidgets(prev => prev.map((w, i) => i === currentIndex ? { ...w, splitUrl: url } : w));
+        } else if (action === 'mini') {
+            window.electronAPI.openMiniPlayer(url, 'Enlace Externo');
+        }
+        setLinkPrompt(null);
+    };
+
+    useEffect(() => {
+        if (window.electronAPI && window.electronAPI.onOpenLinkChoice) {
+            window.electronAPI.onOpenLinkChoice((data) => {
+                if (data.forceSplit) {
+                    handleLinkAction(data.url, 'split');
+                } else {
+                    setLinkPrompt(data);
+                }
+            });
+        }
+    }, []);
+
+    const closeSplit = () => {
+        const updated = widgets.map((w, i) => i === activeIndex ? { ...w, splitUrl: null } : w);
+        setWidgets(updated);
+    };
 
     const toggleFullScreen = () => {
         if (!isFullScreen) {
@@ -287,17 +348,26 @@ function App() {
     const miniName = searchParams.get('name');
 
     if (isMiniMode) {
+        if (widgets.length === 0) return <div className="mini-player-container"><p className="empty-text">Sin widgets</p></div>;
+
         return (
             <div className="mini-player-container">
                 <div className="mini-header">
+                    <button className="mini-nav-btn" onClick={prevWidget} title="Anterior">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
                     <div className="mini-drag-region">
-                        <span className="mini-title">{miniName}</span>
+                        <span className="mini-title">{activeWidget.name}</span>
                     </div>
+                    <button className="mini-nav-btn" onClick={nextWidget} title="Siguiente">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
                     <button className="mini-close-btn" onClick={() => window.close()}>×</button>
                 </div>
-                <div className="mini-body">
+                <div className="mini-body" style={{ backgroundColor: activeWidget.bgColor || '#000000' }}>
                     <webview
-                        src={miniUrl}
+                        key={activeWidget.id}
+                        src={activeWidget.url}
                         style={{ width: '100%', height: '100%', border: 'none' }}
                         allowfullscreen
                         partition="persist:main"
@@ -479,6 +549,9 @@ function App() {
                                 <button className="control-btn" onClick={() => setEditingWidget(activeWidget)} title="Editar">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                                 </button>
+                                <button className="control-btn" onClick={() => setIsSplitInputOpen(!isSplitInputOpen)} title="Dividir Pantalla">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="3" x2="12" y2="21"></line></svg>
+                                </button>
                                 <button className="control-btn" onClick={() => window.electronAPI.openMiniPlayer(activeWidget.url, activeWidget.name)} title="Abrir en ventana pequeña">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                                 </button>
@@ -507,23 +580,106 @@ function App() {
                             {widgets.map((widget, index) => (
                                 <div
                                     key={widget.id}
-                                    className={`iframe-wrapper ${index === activeIndex ? 'active' : 'hidden'}`}
+                                    className={`iframe-wrapper ${index === activeIndex ? 'active' : 'hidden'} ${widget.splitUrl ? 'split-view' : ''}`}
                                     style={{ backgroundColor: widget.bgColor || '#000000' }}
                                 >
-                                    <webview
-                                        id={`widget-${widget.id}`}
-                                        src={widget.url}
-                                        style={{ width: '100%', height: '100%', border: 'none' }}
-                                        allowfullscreen
-                                        partition="persist:main"
-                                        useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                                    ></webview>
+                                    <div className="webview-column primary-view">
+                                        <webview
+                                            id={`widget-${widget.id}`}
+                                            src={widget.url}
+                                            style={{ width: '100%', height: '100%', border: 'none' }}
+                                            allowfullscreen
+                                            partition="persist:main"
+                                            useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                                        ></webview>
+                                    </div>
+                                    {widget.splitUrl && (
+                                        <div className="webview-column secondary-view">
+                                            <div className="split-header">
+                                                <span className="split-url-text">{widget.splitUrl}</span>
+                                                <button className="close-split-btn" onClick={closeSplit}>×</button>
+                                            </div>
+                                            <webview
+                                                src={widget.splitUrl}
+                                                style={{ width: '100%', height: '100%', border: 'none' }}
+                                                allowfullscreen
+                                                partition="persist:main"
+                                                useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                                            ></webview>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
             </main>
+
+            {linkPrompt && (
+                <div className="modal-overlay prompt-overlay" onClick={() => setLinkPrompt(null)}>
+                    <div className="modal-content prompt-modal" onClick={e => e.stopPropagation()}>
+                        <h3>¿Cómo quieres abrir este enlace?</h3>
+                        <p className="prompt-url">{linkPrompt.url}</p>
+                        <div className="prompt-actions">
+                            <button className="prompt-opt" onClick={() => handleLinkAction(linkPrompt.url, 'split')}>
+                                <span className="opt-icon">🌓</span>
+                                <div className="opt-text">
+                                    <strong>Dividir Pantalla (Split)</strong>
+                                    <span>Ver ambos al mismo tiempo</span>
+                                </div>
+                            </button>
+                            <button className="prompt-opt" onClick={() => handleLinkAction(linkPrompt.url, 'mini')}>
+                                <span className="opt-icon">🔳</span>
+                                <div className="opt-text">
+                                    <strong>Ventana Flotante (Mini)</strong>
+                                    <span>Abrir en ventana pequeña</span>
+                                </div>
+                            </button>
+                            <button className="prompt-opt primary-opt" onClick={() => handleLinkAction(linkPrompt.url, 'browser')}>
+                                <span className="opt-icon">🌍</span>
+                                <div className="opt-text">
+                                    <strong>Navegador Externo</strong>
+                                    <span>Abrir en {selectedBrowser}</span>
+                                </div>
+                            </button>
+                        </div>
+                        <button className="prompt-cancel" onClick={() => setLinkPrompt(null)}>Cancelar</button>
+                    </div>
+                </div>
+            )}
+
+            {isSplitInputOpen && (
+                <div className="modal-overlay prompt-overlay" onClick={() => setIsSplitInputOpen(false)}>
+                    <div className="modal-content prompt-modal" onClick={e => e.stopPropagation()}>
+                        <h3>Dividir Pantalla</h3>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '15px' }}>
+                            Pega una URL para verla junto al widget actual.
+                        </p>
+                        <div className="form-group">
+                            <input
+                                type="url"
+                                placeholder="https://..."
+                                value={splitInputUrl}
+                                onChange={(e) => setSplitInputUrl(e.target.value)}
+                                style={{ width: '100%' }}
+                                autoFocus
+                            />
+                        </div>
+                        <div className="prompt-actions" style={{ marginTop: '15px' }}>
+                            <button className="save-btn" onClick={() => {
+                                if (splitInputUrl) {
+                                    handleLinkAction(splitInputUrl, 'split');
+                                    setIsSplitInputOpen(false);
+                                    setSplitInputUrl('');
+                                }
+                            }}>
+                                Dividir ahora
+                            </button>
+                        </div>
+                        <button className="prompt-cancel" onClick={() => setIsSplitInputOpen(false)}>Cancelar</button>
+                    </div>
+                </div>
+            )}
 
             {(isModalOpen || editingWidget) && (
                 <div className="modal-overlay" onClick={() => { setIsModalOpen(false); setEditingWidget(null); }}>

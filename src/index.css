@@ -1057,9 +1057,29 @@ iframe {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 10px;
+    padding: 0 5px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     user-select: none;
+    gap: 5px;
+}
+
+.mini-nav-btn {
+    -webkit-app-region: no-drag;
+    background: none;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s;
+    border-radius: 4px;
+}
+
+.mini-nav-btn:hover {
+    color: var(--primary);
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .mini-drag-region {
@@ -1067,7 +1087,8 @@ iframe {
     height: 100%;
     display: flex;
     align-items: center;
-    -webkit-app-region: drag; /* Permite mover la ventana */
+    -webkit-app-region: drag;
+    /* Permite mover la ventana */
 }
 
 .mini-title {
