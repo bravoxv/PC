@@ -4,6 +4,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openDevTools: () => ipcRenderer.send('open-devtools'),
     openExternal: (url, browser) => ipcRenderer.send('open-external', { url, browser }),
     clearData: () => ipcRenderer.send('clear-data'),
-    openMiniPlayer: (url, name) => ipcRenderer.send('open-mini-player', { url, name }),
+    openMiniPlayer: (url, name, id) => ipcRenderer.send('open-mini-player', { url, name, id }),
     onOpenLinkChoice: (callback) => ipcRenderer.on('open-link-choice', (event, data) => callback(data))
 });

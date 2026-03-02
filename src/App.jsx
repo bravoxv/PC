@@ -33,11 +33,20 @@ function App() {
     const [activeIndex, setActiveIndex] = useState(() => {
         const params = new URLSearchParams(window.location.search);
         if (params.get('mode') === 'mini') {
+            const startId = params.get('id');
             const startUrl = params.get('url');
             const saved = localStorage.getItem('widgets');
             const list = saved ? JSON.parse(saved) : [];
-            const found = list.findIndex(w => w.url === startUrl);
-            return found !== -1 ? found : 0;
+
+            // Priority 1: Find by ID
+            if (startId) {
+                const foundById = list.findIndex(w => w.id === startId);
+                if (foundById !== -1) return foundById;
+            }
+
+            // Priority 2: Find by URL (legacy/fallback)
+            const foundByUrl = list.findIndex(w => w.url === startUrl);
+            return foundByUrl !== -1 ? foundByUrl : 0;
         }
         return 0;
     });
@@ -169,6 +178,7 @@ function App() {
     const [linkPrompt, setLinkPrompt] = useState(null); // { url, forceSplit }
     const [isSplitInputOpen, setIsSplitInputOpen] = useState(false);
     const [splitInputUrl, setSplitInputUrl] = useState('');
+    const [isMiniSelectionOpen, setIsMiniSelectionOpen] = useState(false);
 
     const activeIndexRef = useRef(activeIndex);
     useEffect(() => {
@@ -182,9 +192,14 @@ function App() {
         } else if (action === 'split') {
             setWidgets(prev => prev.map((w, i) => i === currentIndex ? { ...w, splitUrl: url } : w));
         } else if (action === 'mini') {
-            window.electronAPI.openMiniPlayer(url, 'Enlace Externo');
+            window.electronAPI.openMiniPlayer(url, 'Enlace Externo', null);
         }
         setLinkPrompt(null);
+    };
+
+    const handleOpenMini = (widget) => {
+        window.electronAPI.openMiniPlayer(widget.url, widget.name, widget.id);
+        setIsMiniSelectionOpen(false);
     };
 
     useEffect(() => {
@@ -348,7 +363,12 @@ function App() {
     const miniName = searchParams.get('name');
 
     if (isMiniMode) {
-        if (widgets.length === 0) return <div className="mini-player-container"><p className="empty-text">Sin widgets</p></div>;
+        // En modo mini, usamos los datos de la URL o el widget activo como respaldo
+        const displayUrl = miniUrl || (activeWidget ? activeWidget.url : '');
+        const displayName = miniName || (activeWidget ? activeWidget.name : 'Cargando...');
+        const displayColor = activeWidget ? activeWidget.bgColor : '#000000';
+
+        if (!displayUrl && widgets.length === 0) return <div className="mini-player-container"><p className="empty-text">Sin contenido</p></div>;
 
         return (
             <div className="mini-player-container">
@@ -357,17 +377,17 @@ function App() {
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="15 18 9 12 15 6"></polyline></svg>
                     </button>
                     <div className="mini-drag-region">
-                        <span className="mini-title">{activeWidget.name}</span>
+                        <span className="mini-title">{displayName}</span>
                     </div>
                     <button className="mini-nav-btn" onClick={nextWidget} title="Siguiente">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="9 18 15 12 9 6"></polyline></svg>
                     </button>
                     <button className="mini-close-btn" onClick={() => window.close()}>×</button>
                 </div>
-                <div className="mini-body" style={{ backgroundColor: activeWidget.bgColor || '#000000' }}>
+                <div className="mini-body" style={{ backgroundColor: displayColor }}>
                     <webview
-                        key={activeWidget.id}
-                        src={activeWidget.url}
+                        key={displayUrl}
+                        src={displayUrl}
                         style={{ width: '100%', height: '100%', border: 'none' }}
                         allowfullscreen
                         partition="persist:main"
@@ -552,7 +572,7 @@ function App() {
                                 <button className="control-btn" onClick={() => setIsSplitInputOpen(!isSplitInputOpen)} title="Dividir Pantalla">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="3" x2="12" y2="21"></line></svg>
                                 </button>
-                                <button className="control-btn" onClick={() => window.electronAPI.openMiniPlayer(activeWidget.url, activeWidget.name)} title="Abrir en ventana pequeña">
+                                <button className="control-btn" onClick={() => setIsMiniSelectionOpen(true)} title="Abrir en ventana pequeña">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                                 </button>
                                 <button className="control-btn" onClick={toggleFullScreen} title="Pantalla Completa">
@@ -596,8 +616,13 @@ function App() {
                                     {widget.splitUrl && (
                                         <div className="webview-column secondary-view">
                                             <div className="split-header">
-                                                <span className="split-url-text">{widget.splitUrl}</span>
-                                                <button className="close-split-btn" onClick={closeSplit}>×</button>
+                                                <span className="split-url-text" title="Click para copiar">{widget.splitUrl}</span>
+                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                    <button className="control-btn" onClick={() => openExternal(widget.splitUrl)} title={`Abrir en ${selectedBrowser}`} style={{ padding: '0', display: 'flex', alignItems: 'center', opacity: 1 }}>
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                                                    </button>
+                                                    <button className="close-split-btn" onClick={closeSplit}>×</button>
+                                                </div>
                                             </div>
                                             <webview
                                                 src={widget.splitUrl}
@@ -635,13 +660,28 @@ function App() {
                                     <span>Abrir en ventana pequeña</span>
                                 </div>
                             </button>
-                            <button className="prompt-opt primary-opt" onClick={() => handleLinkAction(linkPrompt.url, 'browser')}>
-                                <span className="opt-icon">🌍</span>
-                                <div className="opt-text">
-                                    <strong>Navegador Externo</strong>
-                                    <span>Abrir en {selectedBrowser}</span>
-                                </div>
-                            </button>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button className="prompt-opt primary-opt" onClick={() => handleLinkAction(linkPrompt.url, 'browser')} style={{ flex: 1 }}>
+                                    <span className="opt-icon">🌍</span>
+                                    <div className="opt-text">
+                                        <strong>Navegador Externo</strong>
+                                        <span>Abrir enlace ahora</span>
+                                    </div>
+                                </button>
+                                <select
+                                    className="header-browser-select"
+                                    style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '0 10px', border: '1px solid var(--glass-border)', color: 'white', cursor: 'pointer', width: '90px', fontSize: '11px' }}
+                                    value={selectedBrowser}
+                                    onChange={(e) => setSelectedBrowser(e.target.value)}
+                                >
+                                    <option value="chrome">Chrome</option>
+                                    <option value="brave">Brave</option>
+                                    <option value="edge">Edge</option>
+                                    <option value="firefox">Firefox</option>
+                                    <option value="opera">Opera</option>
+                                    <option value="default">Default</option>
+                                </select>
+                            </div>
                         </div>
                         <button className="prompt-cancel" onClick={() => setLinkPrompt(null)}>Cancelar</button>
                     </div>
@@ -677,6 +717,36 @@ function App() {
                             </button>
                         </div>
                         <button className="prompt-cancel" onClick={() => setIsSplitInputOpen(false)}>Cancelar</button>
+                    </div>
+                </div>
+            )}
+
+            {isMiniSelectionOpen && (
+                <div className="modal-overlay prompt-overlay" onClick={() => setIsMiniSelectionOpen(false)}>
+                    <div className="modal-content prompt-modal" style={{ maxWidth: '550px' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                            <h3 style={{ margin: 0 }}>Abrir en Ventana Separada</h3>
+                            <button className="close-sidebar" onClick={() => setIsMiniSelectionOpen(false)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '28px', cursor: 'pointer', lineHeight: 1 }}>×</button>
+                        </div>
+
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '20px', textAlign: 'left' }}>
+                            Selecciona el widget que quieres abrir en una ventana flotante:
+                        </p>
+
+                        <div className="split-selection-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px', maxHeight: '350px', overflowY: 'auto', padding: '5px', marginBottom: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
+                            {widgets.map((w) => (
+                                <button
+                                    key={w.id}
+                                    className="prompt-opt"
+                                    style={{ padding: '15px', flexDirection: 'column', textAlign: 'center', gap: '8px' }}
+                                    onClick={() => handleOpenMini(w)}
+                                >
+                                    <span style={{ fontSize: '2rem' }}>{w.icon || '📺'}</span>
+                                    <strong style={{ fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', color: 'white' }}>{w.name}</strong>
+                                </button>
+                            ))}
+                        </div>
+                        <button className="prompt-cancel" style={{ marginTop: '15px' }} onClick={() => setIsMiniSelectionOpen(false)}>Cerrar</button>
                     </div>
                 </div>
             )}

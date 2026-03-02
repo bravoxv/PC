@@ -186,7 +186,7 @@ function createWindow() {
     });
 
     // SISTEMA DE VENTANA MINI (PiP)
-    ipcMain.on('open-mini-player', (event, { url, name }) => {
+    ipcMain.on('open-mini-player', (event, { url, name, id }) => {
         const miniWin = new BrowserWindow({
             width: 400,
             height: 500,
@@ -206,14 +206,18 @@ function createWindow() {
         });
 
         const isDev = !app.isPackaged;
+        const queryParams = new URLSearchParams({
+            mode: 'mini',
+            url: url,
+            name: name,
+            id: id || ''
+        }).toString();
+
         const miniUrl = isDev
-            ? `http://localhost:5173?mode=mini&url=${encodeURIComponent(url)}&name=${encodeURIComponent(name)}`
-            : `file://${path.join(__dirname, '../dist/index.html')}?mode=mini&url=${encodeURIComponent(url)}&name=${encodeURIComponent(name)}`;
+            ? `http://localhost:5173?${queryParams}`
+            : `file://${path.join(__dirname, '../dist/index.html')}?${queryParams}`;
 
         miniWin.loadURL(miniUrl);
-
-        // Evitar que la ventana principal sea el "padre" para que se puedan mover independientemente
-        // pero podemos guardarla si queremos cerrarlas todas juntas
     });
 
     // Interceptores de navegación para dashboards
@@ -243,35 +247,53 @@ app.whenReady().then(() => {
 
         contents.on('context-menu', (e, params) => {
             const menu = new Menu();
-            if (params.isEditable || params.selectionText.length > 0 || contents.getType() === 'webview') {
+
+            // 1. Edición de texto
+            if (params.isEditable || params.selectionText.length > 0) {
                 menu.append(new MenuItem({ label: 'Cortar', role: 'cut', enabled: params.isEditable }));
                 menu.append(new MenuItem({ label: 'Copiar', role: 'copy', enabled: params.editFlags.canCopy }));
                 menu.append(new MenuItem({ label: 'Pegar', role: 'paste', enabled: params.editFlags.canPaste }));
                 menu.append(new MenuItem({ type: 'separator' }));
+            }
 
-                if (params.linkURL) {
-                    menu.append(new MenuItem({
-                        label: 'Abrir enlace en pantalla dividida',
-                        click: () => {
-                            const mainWin = BrowserWindow.getAllWindows().find(w => !w.isAlwaysOnTop());
-                            if (mainWin) mainWin.webContents.send('open-link-choice', { url: params.linkURL, forceSplit: true });
-                        }
-                    }));
-                    menu.append(new MenuItem({
-                        label: 'Copiar dirección de enlace',
-                        click: () => {
-                            clipboard.writeText(params.linkURL);
-                        }
-                    }));
-                    menu.append(new MenuItem({ type: 'separator' }));
-                }
+            // 2. Detección de Enlaces Reales (<a>)
+            if (params.linkURL) {
+                menu.append(new MenuItem({
+                    label: 'Abrir enlace en pantalla dividida',
+                    click: () => {
+                        const mainWin = BrowserWindow.getAllWindows().find(w => !w.isAlwaysOnTop());
+                        if (mainWin) mainWin.webContents.send('open-link-choice', { url: params.linkURL, forceSplit: true });
+                    }
+                }));
+                menu.append(new MenuItem({
+                    label: 'Copiar dirección de enlace',
+                    click: () => clipboard.writeText(params.linkURL)
+                }));
+                menu.append(new MenuItem({ type: 'separator' }));
+            }
 
-                menu.append(new MenuItem({ label: 'Seleccionar todo', role: 'selectAll' }));
+            // 3. Detección de Imágenes
+            if (params.hasImageContents && params.srcURL) {
+                menu.append(new MenuItem({
+                    label: 'Copiar dirección de imagen',
+                    click: () => clipboard.writeText(params.srcURL)
+                }));
+                menu.append(new MenuItem({ type: 'separator' }));
+            }
 
-                if (contents.getType() === 'webview') {
-                    menu.append(new MenuItem({ type: 'separator' }));
-                    menu.append(new MenuItem({ label: 'Recargar', click: () => contents.reload() }));
-                }
+            // 4. Copiado de Respaldo (Para botones complejos / Mano con dedo)
+            if (contents.getType() === 'webview') {
+                menu.append(new MenuItem({
+                    label: 'Copiar URL de este Widget',
+                    click: () => clipboard.writeText(contents.getURL())
+                }));
+                menu.append(new MenuItem({
+                    label: 'Recargar Widget',
+                    click: () => contents.reload()
+                }));
+            }
+
+            if (menu.items.length > 0) {
                 menu.popup();
             }
         });
