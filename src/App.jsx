@@ -280,6 +280,34 @@ function App() {
 
     const activeWidget = widgets[activeIndex];
 
+    // Lógica para el modo mini (ventana pequeña externa)
+    const searchParams = new URLSearchParams(window.location.search);
+    const isMiniMode = searchParams.get('mode') === 'mini';
+    const miniUrl = searchParams.get('url');
+    const miniName = searchParams.get('name');
+
+    if (isMiniMode) {
+        return (
+            <div className="mini-player-container">
+                <div className="mini-header">
+                    <div className="mini-drag-region">
+                        <span className="mini-title">{miniName}</span>
+                    </div>
+                    <button className="mini-close-btn" onClick={() => window.close()}>×</button>
+                </div>
+                <div className="mini-body">
+                    <webview
+                        src={miniUrl}
+                        style={{ width: '100%', height: '100%', border: 'none' }}
+                        allowfullscreen
+                        partition="persist:main"
+                        useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    ></webview>
+                </div>
+            </div>
+        );
+    }
+
     const isPopoutUrl = (url) => {
         if (!url) return false;
         const u = url.toLowerCase();
@@ -450,6 +478,9 @@ function App() {
                                 />
                                 <button className="control-btn" onClick={() => setEditingWidget(activeWidget)} title="Editar">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                </button>
+                                <button className="control-btn" onClick={() => window.electronAPI.openMiniPlayer(activeWidget.url, activeWidget.name)} title="Abrir en ventana pequeña">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                                 </button>
                                 <button className="control-btn" onClick={toggleFullScreen} title="Pantalla Completa">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>

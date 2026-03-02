@@ -179,6 +179,37 @@ function createWindow() {
         }
     });
 
+    // SISTEMA DE VENTANA MINI (PiP)
+    ipcMain.on('open-mini-player', (event, { url, name }) => {
+        const miniWin = new BrowserWindow({
+            width: 400,
+            height: 500,
+            minWidth: 300,
+            minHeight: 300,
+            frame: false, // Frameless para estilo widget
+            alwaysOnTop: true,
+            backgroundColor: '#0f172a',
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                webSecurity: false,
+                webviewTag: true,
+                partition: 'persist:main',
+                preload: path.join(__dirname, 'preload.js')
+            }
+        });
+
+        const isDev = !app.isPackaged;
+        const miniUrl = isDev
+            ? `http://localhost:5173?mode=mini&url=${encodeURIComponent(url)}&name=${encodeURIComponent(name)}`
+            : `file://${path.join(__dirname, '../dist/index.html')}?mode=mini&url=${encodeURIComponent(url)}&name=${encodeURIComponent(name)}`;
+
+        miniWin.loadURL(miniUrl);
+
+        // Evitar que la ventana principal sea el "padre" para que se puedan mover independientemente
+        // pero podemos guardarla si queremos cerrarlas todas juntas
+    });
+
     // Interceptores de navegación para dashboards
     const handleNavigation = (url) => {
         const u = url.toLowerCase();
